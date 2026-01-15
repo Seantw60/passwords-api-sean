@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requirePermission } from "@/lib/rbac";
+import { updatePostSchema } from "@/lib/validations";
+import { prisma } from "@/lib/prisma";
+
+// GET /api/posts/[id] - Get single post
+export async function GET(request, { params }) {
+  try {
+    const post = await prisma.post.findUnique({
+      where: { id: params.id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        comments: {
+          where: { deletedAt: null },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    // Increment view count
+    await prisma.post.update({
+      where: { id: params.id },
+      data: { viewCount: { increment: 1 } },
+    });
+
+    return NextResponse.json({ post });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/posts/[id] - Update post
+export async function PATCH(request, { params }) {
+  try {
+    const token = await requirePermission(request, "posts:update");
+    if (token instanceof NextResponse) return token;
+
+    const post = await prisma.post.findUnique({
+      where: { id: params.id },
+    });
+
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    // Check ownership (unless admin)
+    if (post.authorId !== token.id && token.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const validated = updatePostSchema.parse(body);
+
+    const updatedPost = await prisma.post.update({
+      where: { id: params.id },
+      data: {
+        ...validated,
+        publishedAt:
+          validated.status === "PUBLISHED" && !post.publishedAt
+            ? new Date()
+            : post.publishedAt,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ post: updatedPost });
+  } catch (error) {
+    if (error.name === "ZodError") {
+      return NextResponse.json(
+        { error: "Validation error", details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/posts/[id] - Delete post
+export async function DELETE(request, { params }) {
+  try {
+    const token = await requirePermission(request, "posts:delete");
+    if (token instanceof NextResponse) return token;
+
+    const post = await prisma.post.findUnique({
+      where: { id: params.id },
+    });
+
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    // Check ownership (unless admin)
+    if (post.authorId !== token.id && token.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Cascade delete will handle comments
+    await prisma.post.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ message: "Post deleted successfully" });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

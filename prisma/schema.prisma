@@ -1,0 +1,42 @@
+// TODO: Part A - Niki (Database Setup Leader)
+// Implement complete Prisma schema with:
+// - Generator configuration for Prisma Client
+// - Datasource configuration for PostgreSQL
+// - UserRole enum (admin, editor, reader)
+// - PostStatus enum (draft, published, archived)
+// - User model with all fields, relations, and indexes
+// - Post model with all fields, relations, and indexes (including full-text search)
+// - Comment model with self-referencing relation for nested replies
+// - Wellness model for privacy-first check-ins
+// - PasswordHistory model for password reuse prevention
+// - AuditLog model for tracking changes
+// - NextAuth models (Account, Session, VerificationToken)
+// - All necessary indexes for performance
+// - All foreign key relations with proper cascade behavior
+
+generator client {
+  provider = "prisma-client-js"
+  // TODO: Add previewFeatures for full-text search
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TODO: Define UserRole enum
+// enum UserRole { ... }
+
+// TODO: Define PostStatus enum  
+// enum PostStatus { ... }
+
+// TODO: Define User model with all required fields and relations
+// model User { ... }
+
+// TODO: Define Post model with all required fields and relations
+// model Post { ... }
+
+// TODO: Define Comment model with self-referencing relation
+// model Comment { ... }
+
+// TODO: Define all other models (Wellness, PasswordHistory, AuditLog, NextAuth models, etc.)
